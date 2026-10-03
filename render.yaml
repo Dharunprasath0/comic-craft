@@ -10,8 +10,14 @@ services:
       - key: GEMINI_API_KEY
         sync: false
       - key: GEMINI_FLASH_MODEL
-        value: gemini-3.8-flash
+        value: gemini-3.5-flash-lite
       - key: GEMINI_PRO_MODEL
-        value: gemini-3.8-flash
-      - key: GEMINI_IMAGE_MODEL
-        value: gemini-3.1-flash-image
+        value: gemini-3.5-flash-lite
+      - key: CLOUDFLARE_ACCOUNT_ID
+        sync: false
+      - key: CLOUDFLARE_API_TOKEN
+        sync: false
+      - key: CLOUDFLARE_IMAGE_MODEL
+        value: "@cf/black-forest-labs/flux-1-schnell"
+      - key: CLOUDFLARE_IMAGE_STEPS
+        value: "4"

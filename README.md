@@ -1,16 +1,36 @@
-# ComicCraft — Render-ready AI Comic Story Creator
+# ComicCraft — Render + Free-Tier Cloudflare Image Generation
 
-ComicCraft turns a short story idea into a five-panel comic. Gemini generates the outline and narration, **Gemini 3.1 Flash Image** generates the panel artwork through Google's hosted API, and the FastAPI app builds a downloadable PDF.
+ComicCraft is a FastAPI web application that turns a short prompt into a five-panel comic. Gemini generates the comic outline and narration; Cloudflare Workers AI generates the panel artwork with FLUX.1 Schnell; the application then builds a preview and downloadable PDF.
 
-This deployment version does **not** run Stable Diffusion, PyTorch, or Diffusers on the web server, so it is lightweight enough for ordinary FastAPI hosting such as Render.
+## Why this deployment version exists
 
-## Project flow
+The original project ran Stable Diffusion locally with PyTorch/Diffusers. That needs substantially more RAM/GPU capacity than a normal free Render web service. A later deployment version used Gemini image generation, but Gemini image API quota can require paid billing. This version instead calls Cloudflare Workers AI for images, so the Render server stays lightweight.
 
-`User -> FastAPI -> Gemini text -> Gemini image API -> 5 panels -> PDF -> browser`
+## Architecture
 
-## 1. Local setup
+Browser -> FastAPI/Render -> Gemini text API -> Cloudflare Workers AI images -> PDF export
 
-Use Python 3.10+.
+## 1. Required accounts
+
+You need:
+
+1. A Google AI Studio Gemini API key for the two text-generation calls.
+2. A free Cloudflare account for Workers AI image generation.
+3. GitHub and Render accounts for deployment.
+
+## 2. Get Cloudflare Workers AI credentials
+
+In Cloudflare:
+
+1. Open the Cloudflare dashboard.
+2. Go to **Workers AI**.
+3. Choose **Use REST API**.
+4. Create a **Workers AI API Token** and copy it.
+5. Copy the **Account ID** shown on the same setup page.
+
+Keep both values secret. Do not commit them to GitHub.
+
+## 3. Local setup
 
 ```bash
 python -m venv env
@@ -20,25 +40,23 @@ Windows PowerShell:
 
 ```powershell
 env\Scripts\Activate.ps1
-pip install -r requirements.txt
-copy .env.example .env
 ```
 
-macOS/Linux:
+Install dependencies:
 
 ```bash
-source env/bin/activate
 pip install -r requirements.txt
-cp .env.example .env
 ```
 
-Open `.env` and replace:
+Copy `.env.example` to `.env` and fill in:
 
 ```text
-GEMINI_API_KEY=your_gemini_api_key_here
+GEMINI_API_KEY=...
+CLOUDFLARE_ACCOUNT_ID=...
+CLOUDFLARE_API_TOKEN=...
 ```
 
-Then run:
+Run:
 
 ```bash
 uvicorn app.main:app --reload
@@ -46,69 +64,75 @@ uvicorn app.main:app --reload
 
 Open `http://127.0.0.1:8000`.
 
-## 2. Upload to GitHub
+## 4. Push to GitHub
 
-Upload the **contents of this folder** to a GitHub repository. The repository root should directly contain `app/`, `templates/`, `static/`, `requirements.txt`, and `render.yaml`.
-
-Do **not** upload a real `.env`. It is already excluded by `.gitignore`.
-
-## 3. Deploy on Render — easiest method
-
-### Option A: Render Blueprint
-
-1. Push this project to GitHub.
-2. In Render choose **New -> Blueprint**.
-3. Select your GitHub repository.
-4. Render reads `render.yaml` automatically.
-5. When asked for `GEMINI_API_KEY`, paste your real Gemini API key.
-6. Create the service and wait for the build to finish.
-
-### Option B: Normal Web Service
-
-Create a **Web Service**, connect the GitHub repository, and use:
-
-**Build Command**
+From this `comiccraft` folder:
 
 ```bash
-pip install -r requirements.txt
+git init
+git add .
+git commit -m "ComicCraft free image deployment"
+git branch -M main
+git remote add origin YOUR_GITHUB_REPOSITORY_URL
+git push -u origin main
 ```
 
-**Start Command**
+If `origin` already exists, use:
 
 ```bash
-uvicorn app.main:app --host 0.0.0.0 --port $PORT
+git remote set-url origin YOUR_GITHUB_REPOSITORY_URL
+git push -u origin main
 ```
 
-Add this Environment Variable in Render:
+## 5. Deploy on Render
+
+This repository includes `render.yaml`.
+
+1. Render -> **New** -> **Blueprint**.
+2. Select the GitHub repository.
+3. Add the requested secret environment variables:
+   - `GEMINI_API_KEY`
+   - `CLOUDFLARE_ACCOUNT_ID`
+   - `CLOUDFLARE_API_TOKEN`
+4. Deploy.
+
+The Blueprint already supplies:
 
 ```text
-GEMINI_API_KEY = your real Gemini API key
+GEMINI_FLASH_MODEL=gemini-3.5-flash-lite
+GEMINI_PRO_MODEL=gemini-3.5-flash-lite
+CLOUDFLARE_IMAGE_MODEL=@cf/black-forest-labs/flux-1-schnell
+CLOUDFLARE_IMAGE_STEPS=4
 ```
 
-The optional model variables are already given in `.env.example` and `render.yaml`.
+## 6. Free-tier note
 
-## Public routes
+This is a free-tier deployment, not unlimited compute. Gemini text and Cloudflare Workers AI each enforce their own free usage/rate limits. When a daily quota is reached, generation must wait until that provider resets its allowance.
 
-- `/` — comic creation page
-- `/generate` — HTML form generation
-- `/generate-comic/json` — JSON API
-- `/docs` — FastAPI Swagger docs
-- `/health` — Render health check
+## 7. Tests
 
-The old public `/test-image` route has been removed so strangers cannot use it to consume image-generation quota directly.
+The included tests mock external AI calls, so they can validate the application without consuming API quota:
 
-## Storage note
+```bash
+pip install -r requirements-dev.txt
+pytest
+```
 
-Render's normal filesystem is ephemeral. ComicCraft writes generated images and PDFs locally only so the current request can preview/download them. Files can disappear after a restart or redeploy. This is fine for a student demo. For permanent user libraries, move generated files to object storage later.
+## Project structure
 
-## API/key note
+```text
+comiccraft/
+├── app/
+├── templates/
+├── static/
+├── tests/
+├── requirements.txt
+├── requirements-dev.txt
+├── render.yaml
+├── .env.example
+└── README.md
+```
 
-The ZIP intentionally contains **no real Gemini API key**. Keep the key in Render's Environment settings (or in a local `.env`) so it is not exposed in GitHub.
+## Security
 
-## Models used by default
-
-- Outline: `gemini-3.8-flash`
-- Narration: `gemini-3.8-flash`
-- Panel images: `gemini-3.1-flash-image`
-
-All three can be changed using environment variables without editing Python code.
+Never commit `.env`, Gemini keys, Cloudflare tokens, or any other secret to GitHub. Store production secrets only in Render Environment Variables.

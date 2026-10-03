@@ -9,13 +9,18 @@ load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# Required secret. On Render, set this in Environment variables.
+# Gemini is used only for text generation (outline + narration).
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip()
+GEMINI_FLASH_MODEL = os.getenv("GEMINI_FLASH_MODEL", "gemini-3.5-flash-lite").strip()
+GEMINI_PRO_MODEL = os.getenv("GEMINI_PRO_MODEL", "gemini-3.5-flash-lite").strip()
 
-# Current stable defaults (October 2026). All are overridable in Render/.env.
-GEMINI_FLASH_MODEL = os.getenv("GEMINI_FLASH_MODEL", "gemini-3.8-flash").strip()
-GEMINI_PRO_MODEL = os.getenv("GEMINI_PRO_MODEL", "gemini-3.8-flash").strip()
-GEMINI_IMAGE_MODEL = os.getenv("GEMINI_IMAGE_MODEL", "gemini-3.1-flash-image").strip()
+# Cloudflare Workers AI is used for free-tier image generation.
+CLOUDFLARE_ACCOUNT_ID = os.getenv("CLOUDFLARE_ACCOUNT_ID", "").strip()
+CLOUDFLARE_API_TOKEN = os.getenv("CLOUDFLARE_API_TOKEN", "").strip()
+CLOUDFLARE_IMAGE_MODEL = os.getenv(
+    "CLOUDFLARE_IMAGE_MODEL", "@cf/black-forest-labs/flux-1-schnell"
+).strip()
+CLOUDFLARE_IMAGE_STEPS = int(os.getenv("CLOUDFLARE_IMAGE_STEPS", "4"))
 
 STATIC_DIR = BASE_DIR / "static"
 PANELS_DIR = STATIC_DIR / "panels"

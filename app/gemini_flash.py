@@ -4,6 +4,7 @@ Gemini Flash integration: turns a user's story idea into a structured,
 """
 
 import json
+import time
 
 from google import genai
 
@@ -66,10 +67,20 @@ Respond ONLY in this valid JSON format, without any explanations or markdown:
     output_text = ""
     try:
         client = _get_client()
-        response = client.models.generate_content(
-            model=GEMINI_FLASH_MODEL,
-            contents=prompt,
-        )
+        response = None
+        for attempt in range(3):
+            try:
+                response = client.models.generate_content(
+                    model=GEMINI_FLASH_MODEL,
+                    contents=prompt,
+                )
+                break
+            except Exception as exc:
+                text = str(exc)
+                if attempt < 2 and ("503" in text or "UNAVAILABLE" in text):
+                    time.sleep(2 * (attempt + 1))
+                    continue
+                raise
         output_text = response.text.strip()
 
         print("\n🔵 RAW GEMINI RESPONSE 🔵\n", output_text)
