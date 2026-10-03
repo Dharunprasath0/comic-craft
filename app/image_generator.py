@@ -2,7 +2,6 @@
 
 import base64
 import re
-import secrets
 import uuid
 
 import requests
@@ -57,7 +56,6 @@ def generate_image(prompt: str, filename: str | None = None) -> str:
     payload = {
         "prompt": comic_prompt[:2048],
         "steps": max(1, min(CLOUDFLARE_IMAGE_STEPS, 8)),
-        "seed": secrets.randbelow(2_147_483_647),
     }
 
     try:
